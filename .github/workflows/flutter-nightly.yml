@@ -1,6 +1,9 @@
 name: Flutter Nightly Build
 
 on:
+  schedule:
+    # schedule build every night
+    - cron: "0 0 * * *"
   workflow_dispatch:
 
 jobs:
@@ -10,4 +13,3 @@ jobs:
     with:
       upload-artifact: true
       upload-tag: "nightly"
-      runs-on: self-hosted
