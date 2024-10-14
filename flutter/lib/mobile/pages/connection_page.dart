@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:auto_size_text_field/auto_size_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
+import 'package:flutter_hbb/common/widgets/connection_page_title.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -211,6 +212,8 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         FocusNode fieldFocusNode,
                         VoidCallback onFieldSubmitted) {
                       fieldTextEditingController.text = _idController.text;
+                      Get.put<TextEditingController>(
+                          fieldTextEditingController);
                       fieldFocusNode.addListener(() async {
                         _idEmpty.value =
                             fieldTextEditingController.text.isEmpty;
@@ -349,9 +352,15 @@ class _ConnectionPageState extends State<ConnectionPage> {
         ),
       ),
     );
+    final child = Column(children: [
+      if (isWebDesktop)
+        getConnectionPageTitle(context, true)
+            .marginOnly(bottom: 10, top: 15, left: 12),
+      w
+    ]);
     return Align(
         alignment: Alignment.topCenter,
-        child: Container(constraints: kMobilePageConstraints, child: w));
+        child: Container(constraints: kMobilePageConstraints, child: child));
   }
 
   @override
@@ -360,6 +369,9 @@ class _ConnectionPageState extends State<ConnectionPage> {
     _idController.dispose();
     if (Get.isRegistered<IDTextEditingController>()) {
       Get.delete<IDTextEditingController>();
+    }
+    if (Get.isRegistered<TextEditingController>()) {
+      Get.delete<TextEditingController>();
     }
     if (!bind.isCustomClient()) {
       platformFFI.unregisterEventHandler(
