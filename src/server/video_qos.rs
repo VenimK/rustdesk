@@ -106,7 +106,7 @@ pub struct VideoQoS {
     fps: u32,
     ratio: f32,
     users: HashMap<i32, UserData>,
-    displays: HashMap<usize, DisplayData>,
+    displays: HashMap<String, DisplayData>,
     bitrate_store: u32,
     adjust_ratio_instant: Instant,
     abr_config: bool,
@@ -117,7 +117,7 @@ impl Default for VideoQoS {
     fn default() -> Self {
         VideoQoS {
             fps: FPS,
-            ratio: 1.0,
+            ratio: BR_BALANCED,
             users: Default::default(),
             displays: Default::default(),
             bitrate_store: 0,
@@ -168,8 +168,8 @@ impl VideoQoS {
         self.users.iter().any(|u| u.1.record)
     }
 
-    pub fn set_support_changing_quality(&mut self, display_idx: usize, support: bool) {
-        if let Some(display) = self.displays.get_mut(&display_idx) {
+    pub fn set_support_changing_quality(&mut self, video_service_name: &str, support: bool) {
+        if let Some(display) = self.displays.get_mut(video_service_name) {
             display.support_changing_quality = support;
         }
     }
@@ -327,7 +327,8 @@ impl VideoQoS {
             user.delay.fps = Some(fps);
         }
         self.adjust_fps();
-        if adjust_ratio {
+        if adjust_ratio && !cfg!(target_os = "linux") {
+            //Reduce the possibility of vaapi being created twice
             self.adjust_ratio(false);
         }
     }
@@ -345,16 +346,17 @@ impl VideoQoS {
 
 // Common adjust functions
 impl VideoQoS {
-    pub fn new_display(&mut self, display_idx: usize) {
-        self.displays.insert(display_idx, DisplayData::default());
+    pub fn new_display(&mut self, video_service_name: String) {
+        self.displays
+            .insert(video_service_name, DisplayData::default());
     }
 
-    pub fn remove_display(&mut self, display_idx: usize) {
-        self.displays.remove(&display_idx);
+    pub fn remove_display(&mut self, video_service_name: &str) {
+        self.displays.remove(video_service_name);
     }
 
-    pub fn update_display_data(&mut self, display_idx: usize, send_counter: usize) {
-        if let Some(display) = self.displays.get_mut(&display_idx) {
+    pub fn update_display_data(&mut self, video_service_name: &str, send_counter: usize) {
+        if let Some(display) = self.displays.get_mut(video_service_name) {
             display.send_counter += send_counter;
         }
         self.adjust_fps();
@@ -412,6 +414,9 @@ impl VideoQoS {
 
     // Adjust quality ratio based on network delay and screen changes
     fn adjust_ratio(&mut self, dynamic_screen: bool) {
+        if !self.in_vbr_state() {
+            return;
+        }
         // Get maximum delay from all users
         let max_delay = self.users.iter().map(|u| u.1.delay.avg_delay()).max();
         let Some(max_delay) = max_delay else {
